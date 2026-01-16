@@ -7,8 +7,9 @@ SCRIPT_NAME="install.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}"
 
-CONFIG_DIR="${REPO_ROOT}/config"
-CONFIG_TARGET="${CONFIG_DIR}/vaultmeta.conf"
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+USER_CONFIG_DIR="${XDG_CONFIG_HOME}/vaultmeta"
+CONFIG_TARGET="${USER_CONFIG_DIR}/vaultmeta.conf"
 CONFIG_EXAMPLE="${CONFIG_DIR}/vaultmeta.conf.example"
 
 LOCAL_BIN_DIR="${HOME}/.local/bin"
@@ -54,7 +55,7 @@ ensure_executable() {
 }
 
 install_config() {
-  mkdir -p "${CONFIG_DIR}"
+  mkdir -p "${USER_CONFIG_DIR}"
   if [[ -f "${CONFIG_TARGET}" ]]; then
     echo "Config exists: ${CONFIG_TARGET}"
     return 0
