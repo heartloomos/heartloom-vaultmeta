@@ -10,7 +10,7 @@ REPO_ROOT="${SCRIPT_DIR}"
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 USER_CONFIG_DIR="${XDG_CONFIG_HOME}/vaultmeta"
 CONFIG_TARGET="${USER_CONFIG_DIR}/vaultmeta.conf"
-CONFIG_EXAMPLE="${CONFIG_DIR}/vaultmeta.conf.example"
+CONFIG_EXAMPLE="${REPO_ROOT}/config/vaultmeta.conf.example"
 
 LOCAL_BIN_DIR="${HOME}/.local/bin"
 LOCAL_BIN_TARGET="${LOCAL_BIN_DIR}/vaultmeta"
