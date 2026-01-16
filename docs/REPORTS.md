@@ -56,4 +56,5 @@ This makes reports self-describing when shared, copied, or viewed later.
 
 - These notes are **always overwritten** on each run.
 - VaultMeta does not create “daily” files or accumulate history in Phase 0.
+- You may need to re-enter your vault in Obsidian after the first run in order for the reports to appear in Obsidian. Subsequent runs will appear immediately.
 - Later phases may add optional diff/history features, but stable notes remain the core contract.
