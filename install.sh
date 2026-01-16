@@ -170,4 +170,70 @@ status() {
   echo "Repo: ${REPO_ROOT}"
   echo "Config: ${CONFIG_TARGET} ($( [[ -f "${CONFIG_TARGET}" ]] && echo "exists" || echo "missing" ))"
   echo "Binary: ${LOCAL_BIN_TARGET} ($( [[ -x "${LOCAL_BIN_TARGET}" ]] && echo "installed" || echo "missing" ))"
-  echo "Shortcut: ${SHORTCUT_PATH
+  echo "Shortcut: ${SHORTCUT_PATH} ($( [[ -x "${SHORTCUT_PATH}" ]] && echo "installed" || echo "missing" ))"
+  echo "Termux detected: $(is_termux && echo "yes" || echo "no")"
+}
+
+uninstall() {
+  # Remove only artifacts we install here
+  if [[ -x "${LOCAL_BIN_TARGET}" ]]; then
+    rm -f "${LOCAL_BIN_TARGET}"
+    echo "Removed: ${LOCAL_BIN_TARGET}"
+  fi
+
+  # Remove shortcut only if it matches our expected name
+  if [[ -e "${SHORTCUT_PATH}" ]]; then
+    rm -f "${SHORTCUT_PATH}"
+    echo "Removed: ${SHORTCUT_PATH}"
+  fi
+
+  # Remove config only if it was created by copying the example and user wants it removed
+  if [[ -f "${CONFIG_TARGET}" ]]; then
+    local ans
+    ans="$(prompt "Remove config file at ${CONFIG_TARGET}? (y/n):" "n")"
+    if [[ "${ans}" == "y" || "${ans}" == "Y" ]]; then
+      rm -f "${CONFIG_TARGET}"
+      echo "Removed: ${CONFIG_TARGET}"
+    else
+      echo "Keeping config: ${CONFIG_TARGET}"
+    fi
+  fi
+
+  rm -f "${INSTALL_MARKER}" 2>/dev/null || true
+  echo "Uninstall complete."
+}
+
+install_all() {
+  touch "${INSTALL_MARKER}"
+  install_config
+  install_bin
+  install_shortcut_optional
+  echo "Install complete."
+  echo "Try: vaultmeta status"
+}
+
+main() {
+  local cmd="${1:-install}"
+  case "${cmd}" in
+    install )
+      install_all
+      ;;
+    uninstall )
+      uninstall
+      ;;
+    edit-config )
+      edit_config
+      ;;
+    status )
+      status
+      ;;
+    * )
+      echo "Usage: ./install.sh {install|uninstall|edit-config|status}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"
+
+# install.sh EOF
