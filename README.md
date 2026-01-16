@@ -60,7 +60,8 @@ Docs:
 
 ## Screenshots (optional)
 
-Screenshots can make the project instantly legible for new users.
+- Screenshots taken on Obsidian Mobile; UI may vary by theme/plugins.
+- Shown content is an example; your vault structure will differ.
 
 Docs:
 - `docs/SCREENSHOTS.md`
