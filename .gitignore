@@ -1,4 +1,7 @@
 # .gitignore
+# Installer marker
+.installed_by_install_sh
+
 # Local config (installer writes here by default)
 config/vaultmeta.conf
 
