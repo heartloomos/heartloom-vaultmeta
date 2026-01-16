@@ -1,30 +1,136 @@
 # INSTALL
 
-## Install (Termux or desktop)
+This doc covers installing VaultMeta on **Termux (Android)** and **desktop shells**.
 
-From repo root:
+VaultMeta installs a single command:
+
+- `vaultmeta` (with subcommands: `tree`, `dirs`, `status`)
+
+It writes **stable, overwrite-on-run** Markdown reports into your vault.
+
+---
+
+## Paths used by this project
+
+### Installed command
+- `~/.local/bin/vaultmeta`
+
+### Config (XDG)
+- `${XDG_CONFIG_HOME:-$HOME/.config}/vaultmeta/vaultmeta.conf`
+
+You can override config location per-run with:
 
 ```sh
-./install.sh install
+VAULTMETA_CONFIG=/path/to/vaultmeta.conf vaultmeta status
 ```
 
-Installs:
-- `vaultmeta` into `~/.local/bin/vaultmeta`
-- Creates `config/vaultmeta.conf` if missing (from example)
-- Optionally installs Termux:Widget shortcut `run-vaultmeta` into `~/.shortcuts/`
+### Termux:Widget shortcut (optional)
+- `~/.shortcuts/run-vaultmeta`
 
-### Termux shortcut behavior (integrity-safe)
-- Detects Termux via `$PREFIX` or `termux-info`
-- If you opt into shortcut creation but Termux shortcuts directory is missing (or not Termux), it will skip with:
+### Default reports written (stable notes)
+Configured by `OUTPUT_DIR` in the config. Defaults to:
 
-“Skipping shortcut creation because Termux shortcut directory does not exist.”
+- `$VAULT_ROOT/30_REFERENCE/vaultmeta/`
 
-## Status
+Reports (overwritten each run):
+
+- `VaultMeta - File Tree.md`
+- `VaultMeta - Directory Blocks.md`
+
+---
+
+## Requirements
+
+- `bash`
+- core utilities: `find`, `sed`, `awk`, `sort`
+- `git` (for cloning/pulling)
+- Optional: Termux:Widget (only if you want a home-screen button)
+
+---
+
+## Install
+
+From the repo root:
 
 ```sh
-./install.sh status
+chmod +x install.sh bin/vaultmeta
+./install.sh install
+hash -r
+```
+
+What install does:
+
+- Creates config (if missing):  
+  `${XDG_CONFIG_HOME:-$HOME/.config}/vaultmeta/vaultmeta.conf`  
+  (copied from `config/vaultmeta.conf.example`)
+- Installs the command to: `~/.local/bin/vaultmeta`
+- Optionally creates Termux:Widget shortcut: `~/.shortcuts/run-vaultmeta`  
+  (Termux only; see below)
+
+### Make sure `~/.local/bin` is on PATH (Termux + desktop)
+
+Check:
+
+```sh
+echo "$PATH" | tr ':' '\n' | grep -x "$HOME/.local/bin" || echo "NOT ON PATH"
+```
+
+If needed (bash):
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+hash -r
+```
+
+---
+
+## Termux:Widget shortcut behavior (integrity-safe)
+
+During install you’ll be asked whether to create a shortcut named `run-vaultmeta`.
+
+Detection rules:
+
+- Termux is detected via `$PREFIX` containing `com.termux`, or `termux-info` being available.
+- If you opt in but the shortcuts directory is missing (or you’re not in Termux), install will skip with:
+
+> “Skipping shortcut creation because Termux shortcut directory does not exist.”
+
+If you want the shortcut, ensure:
+
+```sh
+mkdir -p ~/.shortcuts
+```
+
+---
+
+## Test
+
+### Verify installation
+
+```sh
+command -v vaultmeta
 vaultmeta status
 ```
+
+### Run reports
+
+Run both reports:
+
+```sh
+vaultmeta
+```
+
+Run individually:
+
+```sh
+vaultmeta tree
+vaultmeta dirs
+```
+
+You should see “Wrote:” lines pointing at your configured `OUTPUT_DIR`.
+
+---
 
 ## Edit config
 
@@ -32,13 +138,53 @@ vaultmeta status
 ./install.sh edit-config
 ```
 
-Uses `$EDITOR` when available, otherwise tries `nano`, then `vi`, then a minimal inline prompt.
+This opens the config at:
 
-## Uninstall
+- `${XDG_CONFIG_HOME:-$HOME/.config}/vaultmeta/vaultmeta.conf`
+
+If `$EDITOR` is set, it’s used. Otherwise `nano`, then `vi`, then an inline prompt.
+
+---
+
+## Uninstall (safe)
 
 ```sh
 ./install.sh uninstall
 ```
 
-Uninstall never deletes your vault. It removes installed binary and shortcut.
-It will ask before removing the config file.
+Uninstall:
+
+- removes `~/.local/bin/vaultmeta` (if present)
+- removes `~/.shortcuts/run-vaultmeta` (if present)
+- asks before removing your config file
+
+Uninstall **never deletes your vault**.
+
+---
+
+## Troubleshooting
+
+### `Permission denied` running `./install.sh`
+```sh
+chmod +x install.sh
+```
+
+### `vaultmeta: not found` after install
+```sh
+hash -r
+command -v vaultmeta
+```
+If still missing, confirm `~/.local/bin` is on your PATH (see above).
+
+### `ERROR: Config not found`
+Create the config via:
+
+```sh
+./install.sh install
+```
+
+Or run with an explicit override:
+
+```sh
+VAULTMETA_CONFIG=/path/to/vaultmeta.conf vaultmeta status
+```
