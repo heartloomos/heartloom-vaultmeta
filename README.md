@@ -63,10 +63,10 @@ Docs:
 - Screenshots taken on Obsidian Mobile; UI may vary by theme/plugins.
 - Shown content is an example; your vault structure will differ.
 
-![VaultMeta - File Tree (Obsidian Mobile)](docs/screenshots/obsidian-mobile-file-tree.png)
+![VaultMeta - Settings Summary (Obsidian Mobile)](docs/screenshots/obsidian-mobile-settings-summary.png)
 
 ![VaultMeta - Directory Blocks (Obsidian Mobile)](docs/screenshots/obsidian-mobile-directory-blocks.png)
 
-![VaultMeta - Settings Summary (Obsidian Mobile)](docs/screenshots/obsidian-mobile-settings-summary.png)
+![VaultMeta - File Tree (Obsidian Mobile)](docs/screenshots/obsidian-mobile-file-tree.png)
 
 ![VaultMeta - Termux Shortcut (Android)](docs/screenshots/run-vaultmeta-shortcut.png)
