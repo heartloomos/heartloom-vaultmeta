@@ -58,7 +58,7 @@ Docs:
 - Path resilience: if expected paths are missing, you will be prompted for updated paths and the tool will continue.
 - Uninstall never deletes your vault content.
 
-## Screenshots (optional)
+## Screenshots
 
 - Screenshots taken on Obsidian Mobile; UI may vary by theme/plugins.
 - Shown content is an example; your vault structure will differ.
