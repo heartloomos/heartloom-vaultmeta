@@ -1,0 +1,10 @@
+# .gitignore
+# Local config (installer writes here by default)
+config/vaultmeta.conf
+
+# Editor cruft
+*.swp
+*.swo
+.DS_Store
+
+# .gitignore EOF
