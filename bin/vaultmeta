@@ -1,0 +1,317 @@
+# vaultmeta
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_NAME="vaultmeta"
+VERSION="0.0.1-phase0"
+
+# --- paths (repo-aware) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+CONFIG_FILE_DEFAULT="${REPO_ROOT}/config/vaultmeta.conf"
+CONFIG_FILE_EXAMPLE="${REPO_ROOT}/config/vaultmeta.conf.example"
+
+# --- utilities ---
+now_iso() { date +"%Y-%m-%dT%H:%M:%S%z"; }
+
+trim() {
+  # shellcheck disable=SC2001
+  echo "${1:-}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+is_termux() {
+  if [[ -n "${PREFIX:-}" ]] && [[ "${PREFIX}" == *"com.termux"* ]]; then
+    return 0
+  fi
+  if command -v termux-info >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+die() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+prompt() {
+  # prompt "Message" "default"
+  local msg="$1"
+  local def="${2:-}"
+  local ans=""
+  if [[ -n "${def}" ]]; then
+    read -r -p "${msg} [default: ${def}] " ans || true
+    ans="$(trim "$ans")"
+    if [[ -z "$ans" ]]; then ans="$def"; fi
+  else
+    read -r -p "${msg} " ans || true
+    ans="$(trim "$ans")"
+  fi
+  echo "$ans"
+}
+
+# CSV -> newline list (trimmed, ignore empties)
+csv_to_lines() {
+  local csv="${1:-}"
+  if [[ -z "$csv" ]]; then return 0; fi
+  echo "$csv" | tr ',' '\n' | while IFS= read -r line; do
+    line="$(trim "$line")"
+    [[ -n "$line" ]] && echo "$line"
+  done
+}
+
+load_config() {
+  local cfg="${1:-$CONFIG_FILE_DEFAULT}"
+  if [[ ! -f "$cfg" ]]; then
+    die "Config not found: $cfg (create config/vaultmeta.conf or run ./install.sh install)"
+  fi
+  # shellcheck disable=SC1090
+  source "$cfg"
+
+  # Defaults if unset (still may prompt later)
+  INCLUDE_HIDDEN="${INCLUDE_HIDDEN:-0}"
+  EXCLUDE_DIRS="${EXCLUDE_DIRS:-.git,node_modules}"
+  EXCLUDE_GLOBS="${EXCLUDE_GLOBS:-}"
+  TREE_MAX_DEPTH="${TREE_MAX_DEPTH:-6}"
+  FOLLOW_SYMLINKS="${FOLLOW_SYMLINKS:-0}"
+  INCLUDE_FILES="${INCLUDE_FILES:-1}"
+  OUTPUT_DIR="${OUTPUT_DIR:-}"
+  VAULT_ROOT="${VAULT_ROOT:-}"
+}
+
+ensure_paths_resilient() {
+  # VAULT_ROOT must exist
+  while [[ -z "${VAULT_ROOT:-}" || ! -d "${VAULT_ROOT}" ]]; do
+    if [[ -n "${VAULT_ROOT:-}" && ! -d "${VAULT_ROOT}" ]]; then
+      echo "Missing vault root directory: ${VAULT_ROOT}"
+    fi
+    VAULT_ROOT="$(prompt "Enter VAULT_ROOT (path to your Obsidian vault root):" "")"
+  done
+
+  # OUTPUT_DIR prompt with default inside vault
+  local default_out="${VAULT_ROOT%/}/30_REFERENCE/vaultmeta"
+  if [[ -z "${OUTPUT_DIR:-}" ]]; then
+    OUTPUT_DIR="$(prompt "Enter output directory or press Enter to accept default:" "${default_out}")"
+  fi
+
+  # Create OUTPUT_DIR if missing
+  if [[ ! -d "${OUTPUT_DIR}" ]]; then
+    mkdir -p "${OUTPUT_DIR}" || die "Failed to create OUTPUT_DIR: ${OUTPUT_DIR}"
+  fi
+}
+
+settings_summary() {
+  cat <<EOF
+- VAULT_ROOT: ${VAULT_ROOT}
+- OUTPUT_DIR: ${OUTPUT_DIR}
+- INCLUDE_HIDDEN: ${INCLUDE_HIDDEN}
+- EXCLUDE_DIRS: ${EXCLUDE_DIRS}
+- EXCLUDE_GLOBS: ${EXCLUDE_GLOBS}
+- TREE_MAX_DEPTH: ${TREE_MAX_DEPTH}
+- FOLLOW_SYMLINKS: ${FOLLOW_SYMLINKS}
+- INCLUDE_FILES: ${INCLUDE_FILES}
+EOF
+}
+
+write_header() {
+  # write_header "Report Title" > file
+  local title="$1"
+  cat <<EOF
+---
+type: vaultmeta-report
+title: ${title}
+generated: $(now_iso)
+vault_root: ${VAULT_ROOT}
+output_dir: ${OUTPUT_DIR}
+version: ${VERSION}
+---
+
+## Settings Summary
+
+$(settings_summary)
+
+---
+EOF
+}
+
+# --- find builder ---
+build_find_args() {
+  # Emits an array-like string, but we’ll use eval safely with controlled content.
+  # Better: set global FIND_ARGS as bash array.
+  FIND_ARGS=()
+
+  if [[ "${FOLLOW_SYMLINKS}" == "1" ]]; then
+    FIND_ARGS+=("-L")
+  fi
+
+  FIND_ARGS+=("${VAULT_ROOT}")
+
+  # Depth
+  FIND_ARGS+=("-maxdepth" "${TREE_MAX_DEPTH}")
+
+  # Exclude hidden unless INCLUDE_HIDDEN=1
+  if [[ "${INCLUDE_HIDDEN}" != "1" ]]; then
+    FIND_ARGS+=("(" "-path" "*/.*" ")" "-prune" "-o")
+  fi
+
+  # Exclude dirs by name (prune)
+  local d
+  while IFS= read -r d; do
+    FIND_ARGS+=("(" "-name" "${d}" "-type" "d" ")" "-prune" "-o")
+  done < <(csv_to_lines "${EXCLUDE_DIRS}")
+
+  # Exclude globs (files)
+  local g
+  while IFS= read -r g; do
+    FIND_ARGS+=("(" "-name" "${g}" ")" "-prune" "-o")
+  done < <(csv_to_lines "${EXCLUDE_GLOBS}")
+
+  # What to include at the end
+  if [[ "${INCLUDE_FILES}" == "1" ]]; then
+    FIND_ARGS+=("-print")
+  else
+    FIND_ARGS+=("-type" "d" "-print")
+  fi
+}
+
+# --- report: file tree ---
+report_tree() {
+  ensure_paths_resilient
+  build_find_args
+
+  local out="${OUTPUT_DIR%/}/VaultMeta - File Tree.md"
+  {
+    write_header "VaultMeta - File Tree"
+
+    echo "# 🌿 VaultMeta — File Tree"
+    echo
+    echo "_Stable note. Overwritten each run._"
+    echo
+
+    echo "## Tree"
+    echo
+
+    # Print paths relative to VAULT_ROOT for readability
+    # Then render as an indented tree using awk.
+    # shellcheck disable=SC2016
+    find "${FIND_ARGS[@]}" \
+      | sed "s#^${VAULT_ROOT%/}/##" \
+      | sed 's#^$#.#' \
+      | sort \
+      | awk -F'/' '
+        {
+          depth = NF - 1
+          indent = ""
+          for (i=0; i<depth; i++) indent = indent "  "
+          # show last component
+          name = $NF
+          if ($0 == ".") { name="(vault root)"; indent="" }
+          print indent "- " name
+        }'
+  } > "${out}"
+  echo "Wrote: ${out}"
+}
+
+# --- report: directory blocks ---
+report_dirs() {
+  ensure_paths_resilient
+
+  # For directory blocks, we always list directories (regardless of INCLUDE_FILES)
+  local old_include_files="${INCLUDE_FILES}"
+  INCLUDE_FILES="0"
+  build_find_args
+  INCLUDE_FILES="${old_include_files}"
+
+  local out="${OUTPUT_DIR%/}/VaultMeta - Directory Blocks.md"
+  {
+    write_header "VaultMeta - Directory Blocks"
+
+    echo "# 📁 VaultMeta — Directory Blocks"
+    echo
+    echo "_Stable note. Overwritten each run._"
+    echo
+    echo "## Directories"
+    echo
+
+    # We want absolute paths for copy/paste into shells
+    # Remove the VAULT_ROOT itself (optional) but keep it as first block for convenience.
+    echo '```bash'
+    echo "${VAULT_ROOT}"
+    echo '```'
+    echo
+
+    # Then all subdirs
+    find "${FIND_ARGS[@]}" -type d \
+      | sort \
+      | while IFS= read -r dir; do
+          [[ "${dir%/}" == "${VAULT_ROOT%/}" ]] && continue
+          echo '```bash'
+          echo "${dir}"
+          echo '```'
+          echo
+        done
+  } > "${out}"
+  echo "Wrote: ${out}"
+}
+
+cmd_status() {
+  ensure_paths_resilient
+  echo "${SCRIPT_NAME} ${VERSION}"
+  echo
+  settings_summary
+}
+
+usage() {
+  cat <<EOF
+${SCRIPT_NAME} ${VERSION}
+
+Usage:
+  vaultmeta                Run all reports (tree + dirs)
+  vaultmeta tree           Generate File Tree report
+  vaultmeta dirs           Generate Directory Blocks report
+  vaultmeta status         Print resolved config and effective settings
+  vaultmeta help           Show this help
+
+Config:
+  Uses: ${CONFIG_FILE_DEFAULT}
+  If missing, run: ./install.sh install
+
+EOF
+}
+
+main() {
+  local cmd="${1:-}"
+
+  # Allow override via env var for power users
+  local cfg="${VAULTMETA_CONFIG:-$CONFIG_FILE_DEFAULT}"
+  load_config "$cfg"
+
+  case "${cmd}" in
+    "" )
+      report_tree
+      report_dirs
+      ;;
+    tree )
+      report_tree
+      ;;
+    dirs )
+      report_dirs
+      ;;
+    status )
+      cmd_status
+      ;;
+    help|-h|--help )
+      usage
+      ;;
+    * )
+      echo "Unknown command: ${cmd}" >&2
+      usage
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"
+
+# vaultmeta EOF
